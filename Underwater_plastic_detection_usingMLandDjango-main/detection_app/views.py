@@ -1,12 +1,25 @@
 from django.shortcuts import render,redirect
 from django.conf import settings
 from .forms import ImageUploadForm, VideoUploadForm
-from .models import DetectionImage, DetectionVideo
+from functools import lru_cache
+import logging
 import os
 from ultralytics import YOLO
 import cv2
 import numpy as np
 import tempfile
+
+logger = logging.getLogger(__name__)
+
+
+@lru_cache(maxsize=1)
+def get_yolo_model():
+    import torch
+
+    torch.set_num_threads(1)
+    model_path = os.path.join(settings.BASE_DIR, 'model', 'best.pt')
+    return YOLO(model_path)
+
 
 def index(request):
     image_form = ImageUploadForm()
@@ -18,25 +31,29 @@ def process_image(request):
         form = ImageUploadForm(request.POST, request.FILES)
         if form.is_valid():
             img_obj = form.save()
-            
-            # Load the YOLOv8 model
-            model_path = os.path.join(settings.BASE_DIR, 'model', 'best.pt')
-            model = YOLO(model_path)
-            
-            # Process the image
             img_path = img_obj.image.path
-            results = model(img_path)
-            
-            # Save the result image
-            result_img_path = os.path.join(settings.MEDIA_ROOT, 'results', f'result_{os.path.basename(img_path)}')
-            os.makedirs(os.path.dirname(result_img_path), exist_ok=True)
-            res_plotted = results[0].plot()
-            cv2.imwrite(result_img_path, res_plotted)
-            
-            # Update the model with the result image path
-            img_obj.result_image = f'results/result_{os.path.basename(img_path)}'
-            img_obj.save()
-            
+            result_img_path = os.path.join(
+                settings.MEDIA_ROOT,
+                'results',
+                f'result_{os.path.basename(img_path)}',
+            )
+            try:
+                results = get_yolo_model().predict(
+                    source=img_path,
+                    device='cpu',
+                    imgsz=640,
+                    workers=0,
+                    verbose=False,
+                )
+                os.makedirs(os.path.dirname(result_img_path), exist_ok=True)
+                if not cv2.imwrite(result_img_path, results[0].plot()):
+                    raise OSError(f'Could not write detection result to {result_img_path}')
+                img_obj.result_image = f'results/{os.path.basename(result_img_path)}'
+                img_obj.save()
+            except Exception:
+                logger.exception('Image detection failed for upload %s', img_obj.pk)
+                raise
+
             return render(request, 'detection_app/image_result.html', {'img_obj': img_obj})
     
     return redirect('index')
@@ -47,9 +64,7 @@ def process_video(request):
         if form.is_valid():
             video_obj = form.save()
             
-            # Load the YOLOv8 model
-            model_path = os.path.join(settings.BASE_DIR, 'model', 'best.pt')
-            model = YOLO(model_path)
+            model = get_yolo_model()
             
             # Process the video
             video_path = video_obj.video.path
@@ -73,7 +88,13 @@ def process_video(request):
                     break
                 
                 # Run YOLOv8 inference on the frame
-                results = model(frame)
+                results = model.predict(
+                    source=frame,
+                    device='cpu',
+                    imgsz=640,
+                    workers=0,
+                    verbose=False,
+                )
                 
                 # Plot results on frame
                 res_plotted = results[0].plot()
