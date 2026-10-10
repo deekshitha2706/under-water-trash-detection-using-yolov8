@@ -29,6 +29,7 @@ def process_image(request):
             
             # Save the result image
             result_img_path = os.path.join(settings.MEDIA_ROOT, 'results', f'result_{os.path.basename(img_path)}')
+            os.makedirs(os.path.dirname(result_img_path), exist_ok=True)
             res_plotted = results[0].plot()
             cv2.imwrite(result_img_path, res_plotted)
             
@@ -61,6 +62,7 @@ def process_video(request):
             
             # Create result video writer
             result_video_path = os.path.join(settings.MEDIA_ROOT, 'results', f'result_{os.path.basename(video_path)}')
+            os.makedirs(os.path.dirname(result_video_path), exist_ok=True)
             fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # or 'XVID' if mp4v doesn't work
             out = cv2.VideoWriter(result_video_path, fourcc, fps, (width, height))
             

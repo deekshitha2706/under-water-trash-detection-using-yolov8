@@ -2,5 +2,6 @@
 __pycache__/
 *.py[cod]
 Underwater_plastic_detection_usingMLandDjango-main/db.sqlite3
+Underwater_plastic_detection_usingMLandDjango-main/staticfiles/
 Underwater_plastic_detection_usingMLandDjango-main/media/uploads/
 Underwater_plastic_detection_usingMLandDjango-main/media/results/

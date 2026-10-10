@@ -3,3 +3,5 @@ Pillow>=10,<13
 ultralytics>=8,<9
 opencv-python>=4.10,<5
 numpy>=1.26,<3
+gunicorn>=23,<24
+whitenoise>=6.9,<7
